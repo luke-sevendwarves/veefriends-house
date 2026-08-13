@@ -96,6 +96,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 socketserver.TCPServer.allow_reuse_address = True
-with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
-    print(f"serving {ROOT} on http://127.0.0.1:{PORT}/  (scores -> {SCORES})")
+with socketserver.TCPServer(("0.0.0.0", PORT), Handler) as httpd:
+    print(f"serving {ROOT} on http://0.0.0.0:{PORT}/  (scores -> {SCORES})")
     httpd.serve_forever()

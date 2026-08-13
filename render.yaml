@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: veefriends-house
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python tools/serve.py $PORT
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: true
