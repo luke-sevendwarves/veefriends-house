@@ -1,0 +1,81 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>model viewer</title>
+<style>
+ html,body{margin:0;background:#20242a;overflow:hidden;font:12px monospace;color:#ddd}
+ canvas{display:block}
+ #tags{position:absolute;inset:auto 0 6px 0;display:flex;pointer-events:none}
+ #tags div{flex:1;text-align:center;letter-spacing:.16em}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="tags"></div>
+<script src="src/gfx.js"></script>
+<script src="src/models.js"></script>
+<script>
+const c = document.getElementById('c');
+const gl = c.getContext('webgl', {antialias:true});
+const P = makePrograms(gl);
+gl.enable(gl.DEPTH_TEST);
+
+const NAMES = ['iguana','giant','hermit','termite','creativecrab','garyvee'];
+const models = {}, bufs = {};
+for (const n of NAMES) {
+  const t0 = performance.now();
+  models[n] = MODEL_BUILDERS[n]();
+  bufs[n] = models[n].mesh.toBuffers(gl);
+  const bb = models[n].mesh.bounds();
+  console.log(n, 'tris', models[n].mesh.count/3|0,
+    'bounds y', bb.lo[1].toFixed(2), bb.hi[1].toFixed(2),
+    'x', bb.lo[0].toFixed(2), bb.hi[0].toFixed(2),
+    (performance.now()-t0).toFixed(0)+'ms');
+}
+document.getElementById('tags').innerHTML = NAMES.map(n=>`<div>${n}</div>`).join('');
+
+let W,H;
+function resize(){
+  const d = Math.min(devicePixelRatio||1, 2);
+  W = c.width = Math.round(innerWidth*d); H = c.height = Math.round(innerHeight*d);
+  c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px';
+  gl.viewport(0,0,W,H);
+}
+addEventListener('resize', resize); resize();
+
+// spin control: drag to rotate, or auto
+let spin = 0, drag = null, manual = false;
+addEventListener('mousedown', e => { drag = e.clientX; manual = true; });
+addEventListener('mouseup', () => drag = null);
+addEventListener('mousemove', e => { if (drag!==null){ spin += (e.clientX-drag)*0.01; drag = e.clientX; } });
+addEventListener('keydown', e => { if (e.key===' ') manual = !manual; });
+
+const proj = new Float32Array(16), view = new Float32Array(16), vp = new Float32Array(16);
+const model = new Float32Array(16), mvp = new Float32Array(16);
+
+function frame(t){
+  requestAnimationFrame(frame);
+  if (!manual) spin = t*0.0006;
+  gl.clearColor(0.13,0.15,0.18,1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+  const n = NAMES.length;
+  const cw = W/n;
+  for (let i=0;i<n;i++){
+    gl.viewport(i*cw, 0, cw, H);
+    const md = models[NAMES[i]];
+    const bb = md.mesh.bounds();
+    const h = bb.hi[1];
+    const wide = Math.max(bb.hi[0]-bb.lo[0], bb.hi[2]-bb.lo[2]);
+    M4.persp(proj, 0.85, cw/H, 0.05, 60);
+    // frame on whichever is bigger: the height or the widest span
+    const d = Math.max(h*1.35, wide*1.5*(H/cw)*0.55) + 1.0;
+    M4.lookAt(view, 0, h*0.55, d, 0, h*0.48, 0);
+    M4.mul(proj, view, vp);
+    M4.compose(model, 0,0,0, spin, 0,0, 1,1,1);
+    M4.mul(vp, model, mvp);
+    drawChar(gl, P, bufs[NAMES[i]], mvp, model, {
+      fog:[0.13,0.15,0.18], fogD:0.004, cam:[0,h*0.55,d], lamp:0.15,
+      bright:1.0, ink: md.ink || 0.026, light:[0.4,0.85,0.6], rim:[0.05,0.05,0.06],
+    });
+  }
+}
+requestAnimationFrame(frame);
+</script>
+</body></html>

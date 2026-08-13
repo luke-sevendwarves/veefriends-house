@@ -1,0 +1,5 @@
+# runtime state, not source
+scores.json
+*.raw
+.DS_Store
+node_modules/

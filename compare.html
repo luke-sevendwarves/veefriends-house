@@ -1,0 +1,77 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>reference vs model</title>
+<style>
+ html,body{margin:0;background:#e9e9ec;font:11px monospace;color:#222}
+ .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:6px}
+ .cell{background:#fff;border:1px solid #ccc}
+ .cell h3{margin:0;padding:3px;font-size:10px;letter-spacing:.1em;background:#222;color:#fff;text-align:center}
+ .pair{display:flex}
+ .pair>*{width:50%;height:250px;object-fit:contain;display:block;background:#f4f4f6}
+ canvas{background:#f4f4f6}
+ .lbl{display:flex;font-size:9px;color:#777}
+ .lbl span{width:50%;text-align:center;padding:2px}
+</style></head><body>
+<div class="grid" id="g"></div>
+<script src="src/gfx.js"></script>
+<script src="src/models.js"></script>
+<script>
+const NAMES = ['iguana','giant','hermit','termite','creativecrab','garyvee'];
+const g = document.getElementById('g');
+const cells = {};
+for (const n of NAMES) {
+  const d = document.createElement('div'); d.className='cell';
+  d.innerHTML = `<h3>${n}</h3><div class="pair">
+    <img src="assets/final/${n}.png">
+    <canvas width="440" height="460"></canvas></div>
+    <div class="lbl"><span>reference</span><span>model</span></div>`;
+  g.appendChild(d);
+  cells[n] = d.querySelector('canvas');
+}
+
+// one shared offscreen GL context, blitted into each cell canvas
+const off = document.createElement('canvas');
+off.width = 440; off.height = 460;
+const gl = off.getContext('webgl', {antialias:true, preserveDrawingBuffer:true});
+const P = makePrograms(gl);
+gl.enable(gl.DEPTH_TEST);
+
+const models = {}, bufs = {};
+for (const n of NAMES) { models[n] = MODEL_BUILDERS[n](); bufs[n] = models[n].mesh.toBuffers(gl); }
+
+const proj = new Float32Array(16), view = new Float32Array(16), vp = new Float32Array(16);
+const model = new Float32Array(16), mvp = new Float32Array(16);
+let spin = 0;
+
+function draw(){
+  for (const n of NAMES) {
+    const md = models[n], bb = md.mesh.bounds();
+    const h = bb.hi[1], wide = Math.max(bb.hi[0]-bb.lo[0], bb.hi[2]-bb.lo[2]);
+    gl.viewport(0,0,440,460);
+    gl.clearColor(0.957,0.957,0.965,1);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    M4.persp(proj, 0.80, 440/460, 0.05, 60);
+    const d = Math.max(h*1.30, wide*1.32) + 0.6;
+    M4.lookAt(view, 0, h*0.55, d, 0, h*0.50, 0);
+    M4.mul(proj, view, vp);
+    M4.compose(model, 0,0,0, spin, 0,0, 1,1,1);
+    M4.mul(vp, model, mvp);
+    drawChar(gl, P, bufs[n], mvp, model, {
+      fog:[0.957,0.957,0.965], fogD:0.002, cam:[0,h*0.55,d], lamp:0.10,
+      bright:1.05, ink: md.ink || 0.026, light:[0.35,0.9,0.55], rim:[0,0,0],
+    });
+    const ctx = cells[n].getContext('2d');
+    ctx.clearRect(0,0,440,460);
+    ctx.drawImage(off,0,0);
+  }
+}
+draw();
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') spin += 0.35;
+  if (e.key === 'ArrowLeft') spin -= 0.35;
+  if (e.key === '0') spin = 0;
+  draw();
+});
+window.redraw = draw;
+window.setSpin = v => { spin = v; draw(); };
+</script>
+</body></html>
