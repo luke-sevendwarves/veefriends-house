@@ -17,4 +17,4 @@ services:
       - key: PYTHONUNBUFFERED
         value: true
       - key: DATABASE_URL
-        sync: false # paste your Neon connection string in the dashboard
+        sync: false # paste the Supabase pooler connection string in the dashboard
