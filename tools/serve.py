@@ -17,6 +17,7 @@ import sys
 import threading
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8731
+PROD = bool(os.environ.get("RENDER"))  # Render sets this; local dev stays no-store
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCORES = os.path.join(ROOT, "scores.json")
 LOCK = threading.Lock()
@@ -43,9 +44,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*a, directory=ROOT, **kw)
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
+        if PROD and not self.path.split("?")[0].startswith("/api/"):
+            # in production let browsers cache the big static payloads
+            self.send_header("Cache-Control", "public, max-age=3600")
+        else:
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
         super().end_headers()
 
     def _json(self, payload, code=200):
@@ -95,7 +100,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-socketserver.TCPServer.allow_reuse_address = True
-with socketserver.TCPServer(("0.0.0.0", PORT), Handler) as httpd:
+class Server(socketserver.ThreadingTCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+with Server(("0.0.0.0", PORT), Handler) as httpd:
     print(f"serving {ROOT} on http://0.0.0.0:{PORT}/  (scores -> {SCORES})")
     httpd.serve_forever()
