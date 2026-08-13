@@ -1,11 +1,20 @@
 services:
+  # The game itself: static files on Render's CDN (gzip + caching for free)
   - type: web
     name: veefriends-house
-    env: python
-    region: oregon
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+
+  # Leaderboard API only; the game calls it cross-origin
+  - type: web
+    name: veefriends-house-api
+    runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python tools/serve.py $PORT
     envVars:
       - key: PYTHONUNBUFFERED
         value: true
+      - key: DATABASE_URL
+        sync: false # paste your Neon connection string in the dashboard

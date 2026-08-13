@@ -3491,9 +3491,13 @@ function nearestStair(dir) {
    and every browser on the machine sees the same one. If the server is not
    there (opened as a file, say) it falls back to this browser's own storage. */
 let boardCache = null;
+/* Local dev serves game + API from one origin; in production the game is a
+   static site and the API is its own service. */
+const SCORES_API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? "" : "https://veefriends-house-api.onrender.com";
 async function fetchBoard() {
   try {
-    const r = await fetch("/api/scores", { cache: "no-store" });
+    const r = await fetch(SCORES_API + "/api/scores", { cache: "no-store" });
     if (!r.ok) throw 0;
     boardCache = await r.json();
     return boardCache;
@@ -3501,7 +3505,7 @@ async function fetchBoard() {
 }
 async function postScore(rec) {
   try {
-    const r = await fetch("/api/scores", {
+    const r = await fetch(SCORES_API + "/api/scores", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rec),
     });
